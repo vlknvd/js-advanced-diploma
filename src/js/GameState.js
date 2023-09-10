@@ -1,6 +1,9 @@
 export default class GameState {
-  static from(object) {
-    // TODO: create object
-    return null;
+  constructor() {
+    this.level = 1;
+    this.allCell = [];
+    this.player = true;
+    this.selectedCell = null;
+    this.selectedCharacter = '';
   }
 }
