@@ -24,15 +24,10 @@ export default class GameController {
     this.computerTeam = [];
     this.startPosition = [];
     this.seceltedCell = null;
-    this.selectCharacter = [];
-    this.selectCharacterPosition = [];
-    this.selectComputerPosition = [];
-    this.selectCharacterComputer = [];
+    this.selectCharacter = '';
   }
 
   init() {
-    this.gamePlay.drawUi(themes[this.gameState.level]);
-
     this.startNewGame();
 
     this.gamePlay.addCellEnterListener(this.onCellEnter.bind(this));
@@ -80,10 +75,9 @@ export default class GameController {
           if (this.seceltedCell !== null) {
             this.gamePlay.deselectCell(this.seceltedCell);
           }
-          this.gamePlay.selectCell(char.position, 'yellow');
+          this.gamePlay.selectCell(index, 'yellow');
           this.seceltedCell = index;
           this.selectCharacter = char.character;
-          this.selectCharacterPosition = char.position;
           this.gameState.player = true;
         }
       }
@@ -149,12 +143,18 @@ export default class GameController {
         limitColumn.push(i);
       }
     }
-
     for (let i = -range; i < range + 1; i += 1) {
-      for (let j = -range; j < range + 1; j += 1) {
+      const x = i === 0 ? range : Math.abs(i);
+      const y = i === 0 ? 1 : Math.abs(i);
+      for (let j = -x; j < x + 1; j += y) {
         position = index + i * 8 + j;
-        const item = Math.floor(position / 8) === Math.floor(index / 8) + i;
-        if (position !== index && !usedPositions.includes(position) && item && position >= 0 && position < 64 && limitRow.indexOf(position % 8) >= 0 && limitColumn.indexOf(Math.floor(position / 8)) >= 0) {
+        if (position !== index
+        && !usedPositions.includes(position)
+        && Math.floor(position / 8) === Math.floor(index / 8) + i
+        && position >= 0
+        && position < 64
+        && limitRow.indexOf(position % 8) >= 0
+        && limitColumn.indexOf(Math.floor(position / 8)) >= 0) {
           rangeList.push(position);
         }
       }
@@ -177,46 +177,82 @@ export default class GameController {
   }
 
   computerAttack() {
-    if (this.gameState.player === false) {
-      const move = this.positionMove(this.selectCharacterComputer, this.selectComputerPosition);
-      const attack = this.positionAttack(this.selectCharacterComputer, this.selectComputerPosition);
-      const index = Math.floor(Math.random() * move.length);
-      if (this.seceltedCell !== index) {
-        for (let i = 0; i < this.startPosition.length; i += 1) {
-          if (this.selectComputerPosition === this.startPosition[i].position) {
-            this.startPosition[i].position = index;
+    const playerTeam = [];
+    const computerTeam = [];
+    const maxDamage = {
+      damage: 0,
+    };
+    for (const player of this.startPosition) {
+      if (player.character.type === 'bowman' || player.character.type === 'swordsman' || player.character.type === 'magician') {
+        playerTeam.push(player);
+      }
+      if (player.character.type === 'undead' || player.character.type === 'vampire' || player.character.type === 'daemon') {
+        computerTeam.push(player);
+      }
+      for (const computer of computerTeam) {
+        const attacker = computer.character;
+        const attackerPosition = computer.position;
+        const positionsToAttack = this.positionAttack(computer.character, computer.position);
+        for (const char of playerTeam) {
+          if (positionsToAttack.indexOf(char.position) >= 0) {
+            const target = char.character;
+            let damage = Math.max((attacker.attack - target.defence) * 0.2, attacker.attack * 0.1);
+            damage = Math.floor(damage);
+            if (damage > maxDamage.damage) {
+              maxDamage.damage = damage;
+              maxDamage.attackerPosition = attackerPosition;
+              maxDamage.defenderPosition = char.position;
+            }
           }
         }
-        this.gamePlay.redrawPositions(this.startPosition);
-        if (attack.indexOf(this.seceltedCell) >= 0) {
-          const damage = Math.floor(Math.max((this.selectCharacterComputer.attack - this.selectCharacter.defence) * 0.2, this.selectCharacterComputer.attack * 0.1));
-          this.gamePlay.redrawPositions(this.startPosition);
-          this.selectCharacter.health -= damage;
-          this.gamePlay.showDamage(this.selectCharacterPosition, damage);
-        }
       }
-      this.gameState.player = true;
     }
+    if (maxDamage.damage > 0) {
+      const target = this.startPosition.find((item) => item.position === maxDamage.defenderPosition);
+      target.character.health -= maxDamage.damage;
+      if (target.character.health < 1) {
+        this.seceltedCell = null;
+        this.selectedCharacter = '';
+        this.gamePlay.deselectCell(target.position);
+        this.startPosition = this.startPosition.filter((item) => item.position !== target.position);
+      }
+      this.gamePlay.showDamage(target.position, maxDamage.damage).then(() => setTimeout(() => {
+        this.gamePlay.redrawPositions(this.startPosition);
+        if (this.heroTeam.length === 0) {
+          this.gameState.player = false;
+          this.seceltedCell = null;
+          this.selectedCharacter = '';
+        }
+      }, 10));
+      this.gameState.player = true;
+      return;
+    }
+    let random = Math.floor(Math.random() * computerTeam.length);
+    const char = computerTeam[random];
+    const positionsToMove = this.positionMove(char.character, char.position);
+    random = Math.floor(Math.random() * positionsToMove.length);
+    char.position = positionsToMove[random];
+    this.gamePlay.redrawPositions(this.startPosition);
+    this.gameState.player = true;
   }
 
   levelUp() {
-    for (let i = 0; i < this.startPosition.length; i += 1) {
-      const char = this.startPosition[i].character;
+    for (const item of this.startPosition) {
+      const char = item.character;
       char.level += 1;
       char.attack = Math.floor(Math.max(char.attack, (char.attack * (80 + char.health)) / 100));
+      char.defence = Math.floor(Math.max(char.defence, (char.defence * (80 + char.health)) / 100));
       if (char.health + 80 <= 100) {
         char.health += 80;
       } else {
         char.health = 100;
       }
-      char.defence = Math.floor(Math.max(char.defence, (char.defence * (80 + char.health)) / 100));
-      this.heroTeam = char;
-      this.startPosition[i].character = char;
+      item.character = char;
     }
   }
 
   startLevel() {
-    this.computerTeam = generateTeam(this.computer, 1, 1);
+    this.computerTeam = generateTeam(this.computer, this.gameState.level, 2);
     this.startPositionHero = this.positionUser(this.startPositionHero);
     this.startPositionGenerate(this.computerTeam, this.startPositionComputer);
     this.gamePlay.redrawPositions(this.startPosition);
@@ -226,15 +262,15 @@ export default class GameController {
     this.startPosition = [];
     this.seceltedCell = null;
     this.selectCharacter = [];
-    this.selectCharacterPosition = [];
-    this.selectComputerPosition = [];
-    this.selectCharacterComputer = [];
+    this.gameState.level = 1;
+    this.gameState.player = true;
   }
 
   startNewGame() {
     this.clear();
-    this.heroTeam = generateTeam(this.hero, 1, 1);
-    this.computerTeam = generateTeam(this.computer, 1, 1);
+    this.gamePlay.drawUi(themes[this.gameState.level]);
+    this.heroTeam = generateTeam(this.hero, 1, 2);
+    this.computerTeam = generateTeam(this.computer, 1, 2);
 
     this.startPositionHero = this.positionUser(this.heroTeam);
     this.startPositionComputer = this.positionUser(this.computerTeam);
@@ -314,49 +350,50 @@ export default class GameController {
   onCellClick(index) {
     if (this.gameState.player === true) {
       this.selectedCharactar(this.startPosition, index);
-      if (this.selectCharacter !== null) {
-        const attack = this.positionAttack(this.selectCharacter, this.seceltedCell);
-        const move = this.positionMove(this.selectCharacter, this.seceltedCell);
-        if (move.includes(index) && this.selectCharacter !== null) {
-          this.gamePlay.selectCell(index, 'green');
-          for (let i = 0; i < this.startPosition.length; i += 1) {
-            if (this.selectCharacterPosition === this.startPosition[i].position) {
-              this.startPosition[i].position = index;
-            }
-            this.selectComputerPosition = this.startPosition[i].position;
-            this.selectCharacterComputer = this.startPosition[i].character;
+      const positionToMove = this.positionMove(this.selectCharacter, this.seceltedCell);
+      if (positionToMove.indexOf(index) >= 0) {
+        this.startPosition.map((item) => {
+          if (item.position === this.seceltedCell) {
+            item.position = index;
+            this.gamePlay.deselectCell(this.seceltedCell);
+            this.seceltedCell = index;
+            this.gamePlay.selectCell(index, 'yellow');
           }
-          this.gamePlay.redrawPositions(this.startPosition);
-          this.selectedCharactar(this.startPosition, index);
-          this.gameState.player = false;
-          this.computerAttack();
-          if (this.selectCharacter.health < 1) {
-            this.startPosition.splice(this.selectCharacter, 1);
-            this.gamePlay.redrawPositions(this.startPosition);
-            this.gamePlay.deselectCell(index);
-            this.gamePlay.setCursor(cursors.auto);
-          }
-        } else if (attack.indexOf(index) >= 0) {
-          const damage = Math.floor(Math.max((this.selectCharacter.attack - this.selectCharacterComputer.defence) * 0.2, this.selectCharacter.attack * 0.1));
-          this.selectCharacterComputer.health -= damage;
-          if (this.selectCharacterComputer.health < 1) {
+          return item;
+        });
+        this.gamePlay.redrawPositions(this.startPosition);
+        this.computerAttack();
+      }
+      const positionToAttack = this.positionAttack(this.selectCharacter, this.seceltedCell);
+      if (positionToAttack.indexOf(index) >= 0) {
+        const char = this.startPosition.find((item) => item.position === index);
+        if (char) {
+          const damage = Math.floor(Math.max((this.selectCharacter.attack - char.character.defence) * 0.2, this.selectCharacter.attack * 0.1));
+          char.character.health -= damage;
+          if (char.character.health < 1) {
             this.startPosition = this.startPosition.filter((item) => item.position !== index);
-            for (const char of this.computerTeam) {
-              this.computerTeam.splice(char, 1);
+            for (const computer of this.computerTeam) {
+              this.computerTeam.splice(computer, 1);
             }
           }
           this.gamePlay.redrawPositions(this.startPosition);
           if (this.computerTeam.length === 0) {
             if (this.gameState.level === 4) {
+              this.gameState.player = false;
               GamePlay.showMessage('Вы выиграли');
               return;
             }
             this.gameState.level += 1;
-            this.gamePlay.drawUi(themes[this.gameState.level]);
             this.levelUp();
             this.startLevel();
+            this.gamePlay.drawUi(themes[this.gameState.level]);
           }
-          this.gamePlay.showDamage(index, damage);
+          this.gamePlay.showDamage(index, damage).then(() => {
+            setTimeout(() => {
+              this.gameState.player = false;
+              this.computerAttack();
+            }, 10);
+          });
         }
       }
     }
@@ -376,6 +413,7 @@ export default class GameController {
             this.gamePlay.selectCell(index, 'red');
           } else {
             this.gamePlay.setCursor(cursors.notallowed);
+            this.gamePlay.deselectCell(index);
           }
         }
       }
