@@ -24,7 +24,10 @@ export default class GameController {
     this.computerTeam = [];
     this.startPosition = [];
     this.seceltedCell = null;
-    this.selectCharacter = '';
+    this.selectCharacter = [];
+    this.selectCharacterPosition = [];
+    this.selectComputerPosition = [];
+    this.selectCharacterComputer = [];
   }
 
   init() {
@@ -39,31 +42,88 @@ export default class GameController {
     this.gamePlay.addLoadGameListener(this.load.bind(this));
   }
 
-  positionUser(team) {
-    const size = this.gamePlay.boardSize;
-    const userPosition = [];
-    if (team === this.heroTeam) {
-      for (let i = 0; i <= size * (size - 1); i += size) {
-        userPosition.push(i);
-        userPosition.push(i + 1);
-      }
-      return userPosition;
-    }
-    for (let i = 0; i <= size * (size - 1); i += size) {
-      userPosition.push(i + (size - 1));
-      userPosition.push(i + (size - 2));
-    }
-    return userPosition;
+  startNewGame() {
+    this.clear();
+    this.startLevel();
   }
 
-  startPositionGenerate(team, positionTeam) {
-    const start = [];
-    for (let i = 0; i < team.length; i += 1) {
-      let position = positionTeam[Math.floor(Math.random() * positionTeam.length)];
-      while (start.includes(position)) {
-        position = positionTeam[Math.floor(Math.random() * positionTeam.length)];
+  startLevel() {
+    this.gamePlay.drawUi(themes[this.gameState.level]);
+    this.generateTeam(this.hero);
+    this.generateTeam(this.computer);
+
+    this.startPositionGenerate(this.heroTeam);
+    this.startPositionGenerate(this.computerTeam);
+
+    this.gamePlay.redrawPositions(this.startPosition);
+  }
+
+  generateTeam(team) {
+    if (team === this.hero) {
+      const arr = this.startPosition.map((item) => item);
+      this.heroTeam = [];
+      for (const char of arr) {
+        if (char.character.type === 'bowman'
+            || char.character.type === 'swordsman'
+            || char.character.type === 'magician') {
+          this.heroTeam.push(char.character);
+          this.startPosition.shift();
+        }
       }
-      this.startPosition.push(new PositionedCharacter(team[i], position));
+      const number = this.gameState.level + 1 - this.heroTeam.length;
+      if (number) {
+        const team = generateTeam(this.hero, 1, number);
+        this.heroTeam = this.heroTeam.concat(...team);
+      }
+    }
+    if (team === this.computer) {
+      const arr = this.startPosition.map((item) => item);
+      this.computerTeam = [];
+      for (const char of arr) {
+        if (char.character.type === 'undead'
+            || char.character.type === 'vampire'
+            || char.character.type === 'daemon') {
+          this.computerTeam.push(char.character);
+          this.startPosition.shift();
+        }
+      }
+      const number = this.gameState.level + 1 - this.computerTeam.length;
+      if (number) {
+        const team = generateTeam(this.computer, 1, number);
+        this.computerTeam = this.computerTeam.concat(team);
+      }
+    }
+  }
+
+  positionUser(team, usedPositions) {
+    let index = 0;
+    const size = this.gamePlay.boardSize;
+    const position = [];
+    for (const char of team) {
+      if (char.type === 'bowman' || char.type === 'swordsman' || char.type === 'magician') {
+        index = 0;
+      } else {
+        index = 6;
+      }
+    }
+    for (let i = 0; i < size; i += 1) {
+      if (!usedPositions.includes((i * size) + index)) {
+        position.push((i * size) + index);
+      }
+      if (!usedPositions.includes((i * size) + index + 1)) {
+        position.push((i * size) + index + 1);
+      }
+    }
+    const random = Math.floor(Math.random() * position.length);
+    return position[random];
+  }
+
+  startPositionGenerate(team) {
+    const usedPositions = [];
+    for (const char of team) {
+      const position = this.positionUser(team, usedPositions);
+      usedPositions.push(position);
+      this.startPosition.push(new PositionedCharacter(char, position));
     }
   }
 
@@ -216,9 +276,10 @@ export default class GameController {
         this.gamePlay.deselectCell(target.position);
         this.startPosition = this.startPosition.filter((item) => item.position !== target.position);
       }
+      this.gameState.player = false;
       this.gamePlay.showDamage(target.position, maxDamage.damage).then(() => setTimeout(() => {
         this.gamePlay.redrawPositions(this.startPosition);
-        if (this.heroTeam.length === 0) {
+        if (this.teamSize(this.heroTeam) === 0) {
           this.gameState.player = false;
           this.seceltedCell = null;
           this.selectedCharacter = '';
@@ -234,6 +295,7 @@ export default class GameController {
     char.position = positionsToMove[random];
     this.gamePlay.redrawPositions(this.startPosition);
     this.gameState.player = true;
+    console.log(this.gameState.player);
   }
 
   levelUp() {
@@ -251,34 +313,12 @@ export default class GameController {
     }
   }
 
-  startLevel() {
-    this.computerTeam = generateTeam(this.computer, this.gameState.level, 2);
-    this.startPositionHero = this.positionUser(this.startPositionHero);
-    this.startPositionGenerate(this.computerTeam, this.startPositionComputer);
-    this.gamePlay.redrawPositions(this.startPosition);
-  }
-
   clear() {
     this.startPosition = [];
     this.seceltedCell = null;
     this.selectCharacter = [];
     this.gameState.level = 1;
     this.gameState.player = true;
-  }
-
-  startNewGame() {
-    this.clear();
-    this.gamePlay.drawUi(themes[this.gameState.level]);
-    this.heroTeam = generateTeam(this.hero, 1, 2);
-    this.computerTeam = generateTeam(this.computer, 1, 2);
-
-    this.startPositionHero = this.positionUser(this.heroTeam);
-    this.startPositionComputer = this.positionUser(this.computerTeam);
-
-    this.startPositionGenerate(this.heroTeam, this.startPositionHero);
-    this.startPositionGenerate(this.computerTeam, this.startPositionComputer);
-
-    this.gamePlay.redrawPositions(this.startPosition);
   }
 
   save() {
@@ -347,6 +387,30 @@ export default class GameController {
     return `\u{1F396}${character.level} \u{2694}${character.attack} \u{1F6E1}${character.defence}  \u{2764}${character.health}`;
   }
 
+  teamSize(team) {
+    let size = 0;
+    if (team === this.heroTeam) {
+      for (const char of this.startPosition) {
+        if (char.character.type === 'bowman'
+            || char.character.type === 'swordsman'
+            || char.character.type === 'magician') {
+          size += 1;
+        }
+      }
+      return size;
+    }
+    if (team === this.computerTeam) {
+      for (const char of this.startPosition) {
+        if (char.character.type === 'undead'
+            || char.character.type === 'vampire'
+            || char.character.type === 'daemon') {
+          size += 1;
+        }
+      }
+      return size;
+    }
+  }
+
   onCellClick(index) {
     if (this.gameState.player === true) {
       this.selectedCharactar(this.startPosition, index);
@@ -372,28 +436,28 @@ export default class GameController {
           char.character.health -= damage;
           if (char.character.health < 1) {
             this.startPosition = this.startPosition.filter((item) => item.position !== index);
-            for (const computer of this.computerTeam) {
-              this.computerTeam.splice(computer, 1);
-            }
+            // for (const computer of this.computerTeam) {
+            //   this.computerTeam.splice(computer, 1);
+            // }
           }
           this.gamePlay.redrawPositions(this.startPosition);
-          if (this.computerTeam.length === 0) {
+          if (this.teamSize(this.computerTeam) === 0) {
             if (this.gameState.level === 4) {
               this.gameState.player = false;
               GamePlay.showMessage('Вы выиграли');
               return;
             }
             this.gameState.level += 1;
-            this.levelUp();
             this.startLevel();
-            this.gamePlay.drawUi(themes[this.gameState.level]);
+            this.levelUp();
           }
           this.gamePlay.showDamage(index, damage).then(() => {
             setTimeout(() => {
-              this.gameState.player = false;
               this.computerAttack();
-            }, 10);
+            }, 50);
           });
+          this.gameState.player = false;
+          console.log(this.gameState.player);
         }
       }
     }
@@ -430,3 +494,4 @@ export default class GameController {
     }
   }
 }
+
