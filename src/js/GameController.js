@@ -208,13 +208,7 @@ export default class GameController {
       const y = i === 0 ? 1 : Math.abs(i);
       for (let j = -x; j < x + 1; j += y) {
         position = index + i * 8 + j;
-        if (position !== index
-        && !usedPositions.includes(position)
-        && Math.floor(position / 8) === Math.floor(index / 8) + i
-        && position >= 0
-        && position < 64
-        && limitRow.indexOf(position % 8) >= 0
-        && limitColumn.indexOf(Math.floor(position / 8)) >= 0) {
+        if (position !== index && !usedPositions.includes(position) && Math.floor(position / 8) === Math.floor(index / 8) + i && position >= 0 && position < 64 && limitRow.indexOf(position % 8) >= 0 && limitColumn.indexOf(Math.floor(position / 8)) >= 0) {
           rangeList.push(position);
         }
       }
@@ -276,7 +270,6 @@ export default class GameController {
         this.gamePlay.deselectCell(target.position);
         this.startPosition = this.startPosition.filter((item) => item.position !== target.position);
       }
-      this.gameState.player = false;
       this.gamePlay.showDamage(target.position, maxDamage.damage).then(() => setTimeout(() => {
         this.gamePlay.redrawPositions(this.startPosition);
         if (this.teamSize(this.heroTeam) === 0) {
@@ -295,7 +288,6 @@ export default class GameController {
     char.position = positionsToMove[random];
     this.gamePlay.redrawPositions(this.startPosition);
     this.gameState.player = true;
-    console.log(this.gameState.player);
   }
 
   levelUp() {
@@ -391,24 +383,21 @@ export default class GameController {
     let size = 0;
     if (team === this.heroTeam) {
       for (const char of this.startPosition) {
-        if (char.character.type === 'bowman'
-            || char.character.type === 'swordsman'
-            || char.character.type === 'magician') {
+        if (char.character.type === 'bowman' || char.character.type === 'swordsman' || char.character.type === 'magician') {
           size += 1;
         }
       }
-      return size;
+      // return size;
     }
     if (team === this.computerTeam) {
       for (const char of this.startPosition) {
-        if (char.character.type === 'undead'
-            || char.character.type === 'vampire'
-            || char.character.type === 'daemon') {
+        if (char.character.type === 'undead' || char.character.type === 'vampire' || char.character.type === 'daemon') {
           size += 1;
         }
       }
-      return size;
+      // return size;
     }
+    return size;
   }
 
   onCellClick(index) {
@@ -436,9 +425,6 @@ export default class GameController {
           char.character.health -= damage;
           if (char.character.health < 1) {
             this.startPosition = this.startPosition.filter((item) => item.position !== index);
-            // for (const computer of this.computerTeam) {
-            //   this.computerTeam.splice(computer, 1);
-            // }
           }
           this.gamePlay.redrawPositions(this.startPosition);
           if (this.teamSize(this.computerTeam) === 0) {
@@ -448,8 +434,11 @@ export default class GameController {
               return;
             }
             this.gameState.level += 1;
-            this.startLevel();
             this.levelUp();
+            this.seceltedCell = null;
+            this.selectCharacter = [];
+            this.startLevel();
+            return;
           }
           this.gamePlay.showDamage(index, damage).then(() => {
             setTimeout(() => {
@@ -457,7 +446,6 @@ export default class GameController {
             }, 50);
           });
           this.gameState.player = false;
-          console.log(this.gameState.player);
         }
       }
     }
@@ -494,4 +482,3 @@ export default class GameController {
     }
   }
 }
-

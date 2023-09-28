@@ -12,6 +12,8 @@
         "WithStatement"
       ],
       "max-len": "off",
-      "no-alert": "off"
+      "no-alert": "off",
+      "no-shadow": "off",
+      "class-methods-use-this": ["error", { "exceptMethods": ["playAttack", "playMove", "createCharacter", "characterInformation"] }]
     }
   }
